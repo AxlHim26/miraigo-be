@@ -56,6 +56,14 @@ public enum ErrorCode {
     SRS_INVALID_RATING("7001", HttpStatus.BAD_REQUEST, "Invalid SRS rating"),
     SRS_PROGRESS_NOT_FOUND("7002", HttpStatus.NOT_FOUND, "Learning progress not found"),
 
+    // JLPT Errors (8xxx)
+    JLPT_EXAM_NOT_FOUND("8001", HttpStatus.NOT_FOUND, "JLPT exam not found"),
+    JLPT_ATTEMPT_NOT_FOUND("8002", HttpStatus.NOT_FOUND, "JLPT attempt not found"),
+    JLPT_ATTEMPT_ALREADY_SUBMITTED("8003", HttpStatus.CONFLICT, "JLPT attempt already submitted"),
+    JLPT_QUESTION_NOT_FOUND("8004", HttpStatus.NOT_FOUND, "JLPT question not found"),
+    JLPT_QUESTION_NOT_IN_EXAM("8005", HttpStatus.BAD_REQUEST, "Question does not belong to this exam"),
+    JLPT_RESULT_NOT_AVAILABLE("8006", HttpStatus.BAD_REQUEST, "JLPT result is not available yet"),
+
     // System Errors (9xxx)
     INTERNAL_ERROR("9001", HttpStatus.INTERNAL_SERVER_ERROR, "An internal error occurred"),
     SERVICE_UNAVAILABLE("9002", HttpStatus.SERVICE_UNAVAILABLE, "Service is temporarily unavailable");
