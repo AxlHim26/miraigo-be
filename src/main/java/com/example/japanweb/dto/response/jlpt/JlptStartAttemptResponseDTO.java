@@ -14,5 +14,7 @@ public class JlptStartAttemptResponseDTO {
     private Long examId;
     private JlptAttemptStatus status;
     private LocalDateTime startedAt;
+    private Integer totalDurationMinutes;
+    private Integer remainingSeconds;
     private List<JlptAttemptAnswerDTO> answers;
 }

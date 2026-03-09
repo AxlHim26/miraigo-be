@@ -15,5 +15,7 @@ public class JlptAttemptSectionResultDTO {
     private Integer rawScore;
     private Integer rawMaxScore;
     private Integer scaledScore;
+    /** Maximum possible scaled score for this section (always {@code MAX_SECTION_SCALE}). */
+    private Integer scaledMaxScore;
     private List<JlptAttemptResultQuestionDTO> questions;
 }

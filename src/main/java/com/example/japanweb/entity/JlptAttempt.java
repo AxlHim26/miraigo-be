@@ -46,6 +46,9 @@ public class JlptAttempt {
     @Column(name = "passed")
     private Boolean passed;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

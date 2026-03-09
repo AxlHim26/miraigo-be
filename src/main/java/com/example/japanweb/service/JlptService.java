@@ -13,6 +13,8 @@ public interface JlptService {
 
     JlptStartAttemptResponseDTO startAttempt(Long examId, Long userId);
 
+    JlptStartAttemptResponseDTO getAttemptSession(Long attemptId, Long userId);
+
     JlptSaveAnswersResponseDTO saveAnswers(Long attemptId, Long userId, JlptSaveAnswersRequest request);
 
     JlptSubmitAttemptResponseDTO submitAttempt(Long attemptId, Long userId);

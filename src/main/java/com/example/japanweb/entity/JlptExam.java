@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 
 @Data
@@ -42,6 +41,11 @@ public class JlptExam {
 
     @Column(name = "is_published", nullable = false)
     private boolean published;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_status", nullable = false, length = 20)
+    @Builder.Default
+    private JlptContentStatus contentStatus = JlptContentStatus.DRAFT;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

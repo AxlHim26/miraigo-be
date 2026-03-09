@@ -37,6 +37,14 @@ public class JlptController {
         return ApiResponse.success(jlptService.startAttempt(examId, user.getId()));
     }
 
+    @GetMapping("/attempts/{attemptId}")
+    public ApiResponse<JlptStartAttemptResponseDTO> getAttemptSession(
+            @PathVariable Long attemptId,
+            @AuthenticationPrincipal User user
+    ) {
+        return ApiResponse.success(jlptService.getAttemptSession(attemptId, user.getId()));
+    }
+
     @PatchMapping("/attempts/{attemptId}/answers")
     public ApiResponse<JlptSaveAnswersResponseDTO> saveAnswers(
             @PathVariable Long attemptId,

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -19,8 +20,27 @@ import java.util.*;
 public class JlptServiceImpl implements JlptService {
 
     private static final int MAX_SECTION_SCALE = 60;
-    private static final int PASS_TOTAL_SCORE = 90;
-    private static final int PASS_MIN_SECTION_SCORE = 19;
+
+    /**
+     * Per-level pass thresholds based on the official JLPT scoring rubric.
+     * All levels use a 3-section model scaled to 60 points each (180 max).
+     *
+     * <ul>
+     *   <li>N1/N2: total ≥ 100, each section ≥ 19</li>
+     *   <li>N3:    total ≥ 95,  each section ≥ 19</li>
+     *   <li>N4/N5: total ≥ 90,  each section ≥ 38</li>
+     * </ul>
+     *
+     * Defaults to N4/N5 thresholds for any unrecognised level.
+     */
+    private static final Map<String, int[]> LEVEL_PASS_THRESHOLDS = Map.of(
+            "N1", new int[]{100, 19},
+            "N2", new int[]{90,  19},
+            "N3", new int[]{95,  19},
+            "N4", new int[]{90,  19},
+            "N5", new int[]{80,  19}
+    );
+    private static final int[] DEFAULT_PASS_THRESHOLDS = {90, 19};
 
     private final JlptExamRepository jlptExamRepository;
     private final JlptSectionRepository jlptSectionRepository;
@@ -35,7 +55,7 @@ public class JlptServiceImpl implements JlptService {
     @Override
     @Transactional(readOnly = true)
     public List<JlptExamListItemDTO> getPublishedExams() {
-        return jlptExamRepository.findByPublishedTrueOrderByExamYearDescExamMonthDescLevelAsc().stream()
+        return jlptExamRepository.findByPublishedTrueAndContentStatusOrderByExamYearDescExamMonthDescLevelAsc(JlptContentStatus.COMPLETE).stream()
                 .map(exam -> JlptExamListItemDTO.builder()
                         .id(exam.getId())
                         .code(exam.getCode())
@@ -85,14 +105,45 @@ public class JlptServiceImpl implements JlptService {
         Optional<JlptAttempt> existingAttempt = jlptAttemptRepository
                 .findTopByExamIdAndUserIdAndStatusOrderByCreatedAtDesc(examId, userId, JlptAttemptStatus.IN_PROGRESS);
 
-        JlptAttempt attempt = existingAttempt.orElseGet(() -> jlptAttemptRepository.save(
+        if (existingAttempt.isPresent()) {
+            if (getRemainingSeconds(existingAttempt.get()) <= 0) {
+                autoSubmitExpiredAttempt(existingAttempt.get());
+                existingAttempt = Optional.empty();
+            } else {
+                return buildAttemptSessionResponse(existingAttempt.get());
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        // Add 5 minutes grace period for network latency
+        LocalDateTime expiresAt = now.plusMinutes(exam.getTotalDurationMinutes()).plusMinutes(5);
+
+        JlptAttempt attempt = jlptAttemptRepository.save(
                 JlptAttempt.builder()
                         .exam(exam)
                         .user(userRepository.getReferenceById(userId))
                         .status(JlptAttemptStatus.IN_PROGRESS)
-                        .startedAt(LocalDateTime.now())
+                        .startedAt(now)
+                        .expiresAt(expiresAt)
                         .build()
-        ));
+        );
+
+        return buildAttemptSessionResponse(attempt);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public JlptStartAttemptResponseDTO getAttemptSession(Long attemptId, Long userId) {
+        JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
+        if (attempt.getStatus() == JlptAttemptStatus.IN_PROGRESS && getRemainingSeconds(attempt) <= 0) {
+            autoSubmitExpiredAttempt(attempt);
+            attempt = getAttemptOrThrow(attemptId, userId);
+        }
+        return buildAttemptSessionResponse(attempt);
+    }
+
+    private JlptStartAttemptResponseDTO buildAttemptSessionResponse(JlptAttempt attempt) {
+        int remainingSeconds = getRemainingSeconds(attempt);
 
         List<JlptAttemptAnswerDTO> answers = jlptAttemptAnswerRepository.findByAttemptId(attempt.getId()).stream()
                 .map(answer -> JlptAttemptAnswerDTO.builder()
@@ -103,9 +154,11 @@ public class JlptServiceImpl implements JlptService {
 
         return JlptStartAttemptResponseDTO.builder()
                 .attemptId(attempt.getId())
-                .examId(examId)
+                .examId(attempt.getExam().getId())
                 .status(attempt.getStatus())
                 .startedAt(attempt.getStartedAt())
+                .totalDurationMinutes(attempt.getExam().getTotalDurationMinutes())
+                .remainingSeconds(remainingSeconds)
                 .answers(answers)
                 .build();
     }
@@ -115,9 +168,11 @@ public class JlptServiceImpl implements JlptService {
     public JlptSaveAnswersResponseDTO saveAnswers(Long attemptId, Long userId, JlptSaveAnswersRequest request) {
         JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
         ensureAttemptInProgress(attempt);
+        ensureAttemptNotExpired(attempt);
 
         List<JlptSection> sections = jlptSectionRepository.findByExamIdOrderBySectionOrderAsc(attempt.getExam().getId());
         Set<Long> validQuestionIds = getQuestionIdsBySections(sections);
+        Map<Long, Set<String>> validOptionKeysByQuestionId = getValidOptionKeysByQuestionId(validQuestionIds);
 
         int savedCount = 0;
         for (JlptSaveAnswersRequest.AnswerItem item : request.getAnswers()) {
@@ -127,17 +182,17 @@ public class JlptServiceImpl implements JlptService {
             }
 
             String normalizedOptionKey = normalizeOptionKey(item.getSelectedOptionKey());
+            if (normalizedOptionKey != null) {
+                Set<String> validOptionKeys = validOptionKeysByQuestionId.getOrDefault(questionId, Set.of());
+                if (!validOptionKeys.contains(normalizedOptionKey)) {
+                    throw new ApiException(ErrorCode.JLPT_OPTION_KEY_INVALID);
+                }
+            }
 
-            JlptAttemptAnswer answer = jlptAttemptAnswerRepository
-                    .findByAttemptIdAndQuestionId(attemptId, questionId)
-                    .orElseGet(() -> JlptAttemptAnswer.builder()
-                            .attempt(attempt)
-                            .question(jlptQuestionRepository.getReferenceById(questionId))
-                            .build());
-
-            answer.setSelectedOptionKey(normalizedOptionKey);
-            answer.setAnsweredAt(LocalDateTime.now());
-            jlptAttemptAnswerRepository.save(answer);
+            // Single INSERT … ON CONFLICT DO UPDATE per answer instead of a
+            // SELECT + conditional INSERT/UPDATE pair, reducing DB round-trips
+            // from 2*N to N for a typical autosave payload.
+            jlptAttemptAnswerRepository.upsertAnswer(attemptId, questionId, normalizedOptionKey);
             savedCount++;
         }
 
@@ -152,6 +207,15 @@ public class JlptServiceImpl implements JlptService {
     public JlptSubmitAttemptResponseDTO submitAttempt(Long attemptId, Long userId) {
         JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
         ensureAttemptInProgress(attempt);
+        if (getRemainingSeconds(attempt) <= 0) {
+            autoSubmitExpiredAttempt(attempt);
+            return JlptSubmitAttemptResponseDTO.builder()
+                    .attemptId(attempt.getId())
+                    .status(attempt.getStatus())
+                    .totalScaledScore(attempt.getTotalScaledScore())
+                    .passed(attempt.getPassed())
+                    .build();
+        }
 
         ComputedResult computed = computeResult(attempt);
 
@@ -173,6 +237,10 @@ public class JlptServiceImpl implements JlptService {
     @Transactional(readOnly = true)
     public JlptAttemptResultDTO getAttemptResult(Long attemptId, Long userId) {
         JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
+        if (attempt.getStatus() == JlptAttemptStatus.IN_PROGRESS && getRemainingSeconds(attempt) <= 0) {
+            autoSubmitExpiredAttempt(attempt);
+            attempt = getAttemptOrThrow(attemptId, userId);
+        }
         if (attempt.getStatus() != JlptAttemptStatus.SUBMITTED) {
             throw new ApiException(ErrorCode.JLPT_RESULT_NOT_AVAILABLE);
         }
@@ -192,9 +260,14 @@ public class JlptServiceImpl implements JlptService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<JlptAttemptSummaryDTO> getAttemptHistory(Long userId) {
         return jlptAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .peek(attempt -> {
+                    if (attempt.getStatus() == JlptAttemptStatus.IN_PROGRESS && getRemainingSeconds(attempt) <= 0) {
+                        autoSubmitExpiredAttempt(attempt);
+                    }
+                })
                 .map(attempt -> JlptAttemptSummaryDTO.builder()
                         .attemptId(attempt.getId())
                         .examId(attempt.getExam().getId())
@@ -214,9 +287,10 @@ public class JlptServiceImpl implements JlptService {
         JlptExam exam = jlptExamRepository.findById(examId)
                 .orElseThrow(() -> new ApiException(ErrorCode.JLPT_EXAM_NOT_FOUND));
 
-        if (!exam.isPublished()) {
-            throw new ApiException(ErrorCode.JLPT_EXAM_NOT_FOUND);
+        if (!exam.isPublished() || exam.getContentStatus() != JlptContentStatus.COMPLETE) {
+            throw new ApiException(ErrorCode.JLPT_EXAM_NOT_PUBLISHED);
         }
+
         return exam;
     }
 
@@ -229,6 +303,38 @@ public class JlptServiceImpl implements JlptService {
         if (attempt.getStatus() != JlptAttemptStatus.IN_PROGRESS) {
             throw new ApiException(ErrorCode.JLPT_ATTEMPT_ALREADY_SUBMITTED);
         }
+    }
+
+    private void ensureAttemptNotExpired(JlptAttempt attempt) {
+        if (getRemainingSeconds(attempt) <= 0) {
+            autoSubmitExpiredAttempt(attempt);
+            throw new ApiException(ErrorCode.JLPT_EXPIRED);
+        }
+    }
+
+    private int getRemainingSeconds(JlptAttempt attempt) {
+        LocalDateTime now = LocalDateTime.now();
+        if (attempt.getExpiresAt() != null) {
+            long remaining = Duration.between(now, attempt.getExpiresAt()).getSeconds();
+            return Math.max(0, (int) remaining);
+        }
+        long elapsedSeconds = Duration.between(attempt.getStartedAt(), now).getSeconds();
+        // Give 5 minutes grace period for legacy attempts without expiresAt
+        int totalSeconds = (attempt.getExam().getTotalDurationMinutes() + 5) * 60;
+        return Math.max(0, (int) (totalSeconds - elapsedSeconds));
+    }
+
+    private void autoSubmitExpiredAttempt(JlptAttempt attempt) {
+        if (attempt.getStatus() != JlptAttemptStatus.IN_PROGRESS) {
+            return;
+        }
+
+        ComputedResult computed = computeResult(attempt);
+        attempt.setStatus(JlptAttemptStatus.SUBMITTED);
+        attempt.setSubmittedAt(LocalDateTime.now());
+        attempt.setTotalScaledScore(computed.totalScaledScore());
+        attempt.setPassed(computed.passed());
+        jlptAttemptRepository.save(attempt);
     }
 
     private String normalizeOptionKey(String optionKey) {
@@ -252,6 +358,20 @@ public class JlptServiceImpl implements JlptService {
         return result;
     }
 
+    private Map<Long, Set<String>> getValidOptionKeysByQuestionId(Set<Long> questionIds) {
+        if (questionIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Set<String>> result = new HashMap<>();
+        for (JlptQuestionOption option : jlptQuestionOptionRepository.findByQuestionIdInOrderByQuestionIdAscOptionOrderAsc(questionIds)) {
+            Long questionId = option.getQuestion().getId();
+            result.computeIfAbsent(questionId, ignored -> new HashSet<>())
+                    .add(normalizeOptionKey(option.getOptionKey()));
+        }
+        return result;
+    }
+
     private ComputedResult computeResult(JlptAttempt attempt) {
         Long examId = attempt.getExam().getId();
         List<JlptSection> sections = jlptSectionRepository.findByExamIdOrderBySectionOrderAsc(examId);
@@ -265,6 +385,7 @@ public class JlptServiceImpl implements JlptService {
 
         Map<Long, JlptAnswerKey> answerKeyByQuestionId = mapAnswerKeys(questionIds);
         Map<Long, JlptAttemptAnswer> attemptAnswerByQuestionId = mapAttemptAnswers(attempt.getId());
+        Map<Long, List<JlptQuestionOption>> optionsByQuestionId = groupOptionsByQuestionId(questionIds);
 
         Map<Long, List<JlptQuestion>> questionsBySectionId = new LinkedHashMap<>();
         for (JlptQuestion question : questions) {
@@ -272,23 +393,29 @@ public class JlptServiceImpl implements JlptService {
             questionsBySectionId.computeIfAbsent(sectionId, ignored -> new ArrayList<>()).add(question);
         }
 
+        // Resolve pass thresholds for the exam's JLPT level.
+        String level = attempt.getExam().getLevel();
+        int[] thresholds = LEVEL_PASS_THRESHOLDS.getOrDefault(level, DEFAULT_PASS_THRESHOLDS);
+        int passTotal = thresholds[0];
+        int passMinSection = thresholds[1];
+
         List<JlptAttemptSectionResultDTO> sectionResults = new ArrayList<>();
         int totalScaled = 0;
         boolean meetsSectionRule = true;
 
         for (JlptSection section : sections) {
             List<JlptQuestion> sectionQuestions = questionsBySectionId.getOrDefault(section.getId(), List.of());
-            SectionScoring sectionScoring = scoreSection(section, sectionQuestions, answerKeyByQuestionId, attemptAnswerByQuestionId);
+            SectionScoring sectionScoring = scoreSection(section, sectionQuestions, answerKeyByQuestionId, attemptAnswerByQuestionId, optionsByQuestionId);
 
             totalScaled += sectionScoring.scaledScore();
-            if (sectionScoring.scaledScore() < PASS_MIN_SECTION_SCORE) {
+            if (sectionScoring.scaledScore() < passMinSection) {
                 meetsSectionRule = false;
             }
 
             sectionResults.add(sectionScoring.sectionResult());
         }
 
-        boolean passed = totalScaled >= PASS_TOTAL_SCORE && meetsSectionRule;
+        boolean passed = totalScaled >= passTotal && meetsSectionRule;
         return new ComputedResult(sectionResults, totalScaled, passed);
     }
 
@@ -296,7 +423,8 @@ public class JlptServiceImpl implements JlptService {
             JlptSection section,
             List<JlptQuestion> questions,
             Map<Long, JlptAnswerKey> answerKeyByQuestionId,
-            Map<Long, JlptAttemptAnswer> attemptAnswerByQuestionId
+            Map<Long, JlptAttemptAnswer> attemptAnswerByQuestionId,
+            Map<Long, List<JlptQuestionOption>> optionsByQuestionId
     ) {
         int rawScore = 0;
         int rawMaxScore = 0;
@@ -320,6 +448,13 @@ public class JlptServiceImpl implements JlptService {
                 rawScore += weight;
             }
 
+            List<JlptQuestionOptionDTO> optionDTOs = optionsByQuestionId.getOrDefault(question.getId(), List.of()).stream()
+                    .map(option -> JlptQuestionOptionDTO.builder()
+                            .key(option.getOptionKey())
+                            .text(option.getOptionText())
+                            .build())
+                    .toList();
+
             questionResults.add(JlptAttemptResultQuestionDTO.builder()
                     .questionId(question.getId())
                     .questionNumber(question.getQuestionNumber())
@@ -327,6 +462,7 @@ public class JlptServiceImpl implements JlptService {
                     .selectedOptionKey(selectedOption)
                     .correctOptionKey(correctOption)
                     .correct(correct)
+                    .options(optionDTOs)
                     .build());
         }
 
@@ -339,6 +475,7 @@ public class JlptServiceImpl implements JlptService {
                 .rawScore(rawScore)
                 .rawMaxScore(rawMaxScore)
                 .scaledScore(scaled)
+                .scaledMaxScore(MAX_SECTION_SCALE)
                 .questions(questionResults)
                 .build();
 
