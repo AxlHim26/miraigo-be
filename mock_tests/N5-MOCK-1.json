@@ -1,0 +1,196 @@
+{
+  "examCode": "N5-MOCK-1",
+  "replaceExisting": true,
+  "sections": [
+    {
+      "type": "VOCABULARY",
+      "problems": [
+        {
+          "problemNumber": "1",
+          "questions": [
+            {
+              "number": "1",
+              "prompt": "それは　（くるま）　です。",
+              "options": [
+                { "key": "1", "text": "車" },
+                { "key": "2", "text": "東" },
+                { "key": "3", "text": "重" },
+                { "key": "4", "text": "里" }
+              ],
+              "correctAnswer": "1"
+            },
+            {
+              "number": "2",
+              "prompt": "あたらしい　（ほん）　を　かいました。",
+              "options": [
+                { "key": "1", "text": "体" },
+                { "key": "2", "text": "木" },
+                { "key": "3", "text": "本" },
+                { "key": "4", "text": "休" }
+              ],
+              "correctAnswer": "3"
+            },
+            {
+              "number": "3",
+              "prompt": "まいにち　（みず）　を　のみます。",
+              "options": [
+                { "key": "1", "text": "氷" },
+                { "key": "2", "text": "水" },
+                { "key": "3", "text": "永" },
+                { "key": "4", "text": "泳" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "4",
+              "prompt": "きのう　（やま）　に　のぼりました。",
+              "options": [
+                { "key": "1", "text": "川" },
+                { "key": "2", "text": "海" },
+                { "key": "3", "text": "山" },
+                { "key": "4", "text": "出" }
+              ],
+              "correctAnswer": "3"
+            },
+            {
+              "number": "5",
+              "prompt": "（あさ）　ごはんを　たべます。",
+              "options": [
+                { "key": "1", "text": "夕" },
+                { "key": "2", "text": "昼" },
+                { "key": "3", "text": "朝" },
+                { "key": "4", "text": "夜" }
+              ],
+              "correctAnswer": "3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "GRAMMAR_READING",
+      "problems": [
+        {
+          "problemNumber": "2",
+          "questions": [
+            {
+              "number": "6",
+              "prompt": "きのうは　とても　___　です。",
+              "options": [
+                { "key": "1", "text": "さむい" },
+                { "key": "2", "text": "さむかった" },
+                { "key": "3", "text": "さむくない" },
+                { "key": "4", "text": "さむくなかった" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "7",
+              "prompt": "わたしは　コーヒー___　のみます。",
+              "options": [
+                { "key": "1", "text": "が" },
+                { "key": "2", "text": "を" },
+                { "key": "3", "text": "に" },
+                { "key": "4", "text": "で" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "8",
+              "prompt": "がっこう___　いきます。",
+              "options": [
+                { "key": "1", "text": "を" },
+                { "key": "2", "text": "が" },
+                { "key": "3", "text": "に" },
+                { "key": "4", "text": "で" }
+              ],
+              "correctAnswer": "3"
+            },
+            {
+              "number": "9",
+              "prompt": "でんしゃ___　かいしゃに　いきます。",
+              "options": [
+                { "key": "1", "text": "を" },
+                { "key": "2", "text": "に" },
+                { "key": "3", "text": "が" },
+                { "key": "4", "text": "で" }
+              ],
+              "correctAnswer": "4"
+            },
+            {
+              "number": "10",
+              "prompt": "にほんごを　___　ください。",
+              "options": [
+                { "key": "1", "text": "おしえて" },
+                { "key": "2", "text": "おしえ" },
+                { "key": "3", "text": "おしえる" },
+                { "key": "4", "text": "おしえた" }
+              ],
+              "correctAnswer": "1"
+            }
+          ]
+        },
+        {
+          "problemNumber": "3",
+          "questions": [
+            {
+              "number": "11",
+              "prompt": "わたしは　まいあさ　６じに　おきます。そして、コーヒーを　のみます。７じに　ごはんを　たべます。７じはんに　うちを　でます。\nもんだい：わたしは　なんじに　ごはんを　たべますか。",
+              "options": [
+                { "key": "1", "text": "６じ" },
+                { "key": "2", "text": "７じ" },
+                { "key": "3", "text": "７じはん" },
+                { "key": "4", "text": "８じ" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "12",
+              "prompt": "たなかさんは　まいにち　えいごを　べんきょうします。えいごが　すきです。\nもんだい：たなかさんは　なにが　すきですか。",
+              "options": [
+                { "key": "1", "text": "にほんご" },
+                { "key": "2", "text": "えいご" },
+                { "key": "3", "text": "すうがく" },
+                { "key": "4", "text": "れきし" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "13",
+              "prompt": "きのうは　あめでした。だから、うちで　ほんを　よみました。\nもんだい：きのうの　てんきは　どうでしたか。",
+              "options": [
+                { "key": "1", "text": "はれでした" },
+                { "key": "2", "text": "くもりでした" },
+                { "key": "3", "text": "あめでした" },
+                { "key": "4", "text": "ゆきでした" }
+              ],
+              "correctAnswer": "3"
+            },
+            {
+              "number": "14",
+              "prompt": "わたしの　へやは　あかるいです。まどが　おおきいです。\nもんだい：へやは　どんな　へやですか。",
+              "options": [
+                { "key": "1", "text": "くらい　へや" },
+                { "key": "2", "text": "あかるい　へや" },
+                { "key": "3", "text": "せまい　へや" },
+                { "key": "4", "text": "ふるい　へや" }
+              ],
+              "correctAnswer": "2"
+            },
+            {
+              "number": "15",
+              "prompt": "やまださんは　９じに　ねます。あさは　６じに　おきます。\nもんだい：やまださんは　なんじかん　ねますか。",
+              "options": [
+                { "key": "1", "text": "７じかん" },
+                { "key": "2", "text": "８じかん" },
+                { "key": "3", "text": "９じかん" },
+                { "key": "4", "text": "１０じかん" }
+              ],
+              "correctAnswer": "3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
