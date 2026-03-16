@@ -37,10 +37,10 @@ public class JlptServiceImpl implements JlptService {
             "N1", new int[]{100, 19},
             "N2", new int[]{90,  19},
             "N3", new int[]{95,  19},
-            "N4", new int[]{90,  19},
-            "N5", new int[]{80,  19}
+            "N4", new int[]{90,  38},
+            "N5", new int[]{80,  38}
     );
-    private static final int[] DEFAULT_PASS_THRESHOLDS = {90, 19};
+    private static final int[] DEFAULT_PASS_THRESHOLDS = {90, 38};
 
     private final JlptExamRepository jlptExamRepository;
     private final JlptSectionRepository jlptSectionRepository;
@@ -132,7 +132,7 @@ public class JlptServiceImpl implements JlptService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public JlptStartAttemptResponseDTO getAttemptSession(Long attemptId, Long userId) {
         JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
         if (attempt.getStatus() == JlptAttemptStatus.IN_PROGRESS && getRemainingSeconds(attempt) <= 0) {
@@ -234,7 +234,7 @@ public class JlptServiceImpl implements JlptService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public JlptAttemptResultDTO getAttemptResult(Long attemptId, Long userId) {
         JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
         if (attempt.getStatus() == JlptAttemptStatus.IN_PROGRESS && getRemainingSeconds(attempt) <= 0) {
