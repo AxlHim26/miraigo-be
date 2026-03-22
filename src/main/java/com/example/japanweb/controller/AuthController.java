@@ -2,8 +2,11 @@ package com.example.japanweb.controller;
 
 import com.example.japanweb.dto.common.ApiResponse;
 import com.example.japanweb.dto.request.auth.AuthRequest;
-import com.example.japanweb.dto.response.auth.AuthResponse;
+import com.example.japanweb.dto.request.auth.ConfirmEmailVerificationRequest;
 import com.example.japanweb.dto.request.auth.RegisterRequest;
+import com.example.japanweb.dto.request.auth.ResendEmailVerificationRequest;
+import com.example.japanweb.dto.response.auth.AuthResponse;
+import com.example.japanweb.dto.response.auth.EmailVerificationStatusResponse;
 import com.example.japanweb.exception.ApiException;
 import com.example.japanweb.exception.ErrorCode;
 import com.example.japanweb.security.RefreshTokenCookieService;
@@ -28,12 +31,15 @@ public class AuthController {
     private final RefreshTokenCookieService refreshTokenCookieService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        AuthenticationService.IssuedTokens issuedTokens = service.register(request);
-        ApiResponse<AuthResponse> response = ApiResponse.created(AuthResponse.builder()
-                .token(issuedTokens.accessToken())
-                .build());
-        return withRefreshCookie(response, issuedTokens.refreshToken(), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<EmailVerificationStatusResponse>> register(
+            @Valid @RequestBody RegisterRequest request
+    ) {
+        EmailVerificationStatusResponse verificationStatus = service.register(request);
+        ApiResponse<EmailVerificationStatusResponse> response = ApiResponse.created(
+                verificationStatus,
+                "Registration successful. Please check your email to verify your account"
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/authenticate")
@@ -68,6 +74,30 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookieService.buildClearRefreshTokenCookie().toString())
                 .body(response);
+    }
+
+    @PostMapping("/verification/confirm")
+    public ResponseEntity<ApiResponse<AuthResponse>> confirmEmailVerification(
+            @Valid @RequestBody ConfirmEmailVerificationRequest request
+    ) {
+        AuthenticationService.IssuedTokens issuedTokens = service.confirmEmailVerification(request);
+        ApiResponse<AuthResponse> response = ApiResponse.success(
+                AuthResponse.builder().token(issuedTokens.accessToken()).build(),
+                "Email verified successfully"
+        );
+        return withRefreshCookie(response, issuedTokens.refreshToken(), HttpStatus.OK);
+    }
+
+    @PostMapping("/verification/resend")
+    public ResponseEntity<ApiResponse<EmailVerificationStatusResponse>> resendEmailVerification(
+            @Valid @RequestBody ResendEmailVerificationRequest request
+    ) {
+        EmailVerificationStatusResponse verificationStatus = service.resendEmailVerification(request);
+        ApiResponse<EmailVerificationStatusResponse> response = ApiResponse.success(
+                verificationStatus,
+                "A new verification email has been sent"
+        );
+        return ResponseEntity.ok(response);
     }
 
     private <T> ResponseEntity<ApiResponse<T>> withRefreshCookie(
