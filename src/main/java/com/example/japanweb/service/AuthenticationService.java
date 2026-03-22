@@ -1,33 +1,52 @@
 package com.example.japanweb.service;
 
 import com.example.japanweb.dto.request.auth.AuthRequest;
+import com.example.japanweb.dto.request.auth.ConfirmEmailVerificationRequest;
 import com.example.japanweb.dto.request.auth.RegisterRequest;
+import com.example.japanweb.dto.request.auth.ResendEmailVerificationRequest;
+import com.example.japanweb.dto.response.auth.EmailVerificationStatusResponse;
 import com.example.japanweb.entity.User;
+import com.example.japanweb.entity.EmailVerificationToken;
 import com.example.japanweb.exception.ApiException;
 import com.example.japanweb.exception.ErrorCode;
+import com.example.japanweb.repository.EmailVerificationTokenRepository;
 import com.example.japanweb.repository.UserRepository;
 import com.example.japanweb.security.AuthTokenStore;
 import com.example.japanweb.security.JwtService;
+import com.example.japanweb.config.properties.EmailVerificationProperties;
 import lombok.RequiredArgsConstructor;
+import org.springframework.mail.MailException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.security.SecureRandom;
 
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
     private final UserRepository repository;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthTokenStore authTokenStore;
     private final AuthenticationManager authenticationManager;
+    private final EmailVerificationProperties emailVerificationProperties;
+    private final EmailVerificationNotificationService emailVerificationNotificationService;
+    private final SecureRandom secureRandom = new SecureRandom();
 
-    public IssuedTokens register(RegisterRequest request) {
+    @Transactional
+    public EmailVerificationStatusResponse register(RegisterRequest request) {
         if (repository.existsByUsername(request.getUsername())) {
             throw new ApiException(ErrorCode.AUTH_USERNAME_EXISTS);
         }
@@ -40,20 +59,28 @@ public class AuthenticationService {
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.USER)
+                .emailVerified(false)
                 .build();
         repository.save(user);
-        return issueTokens(user);
+        return issueAndSendVerificationToken(user);
     }
 
     public IssuedTokens authenticate(AuthRequest request) {
+        var user = repository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
                         request.getPassword()
                 )
         );
-        var user = repository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+        if (!user.isEmailVerified()) {
+            throw new ApiException(
+                    ErrorCode.AUTH_EMAIL_NOT_VERIFIED,
+                    "Please verify your email before signing in"
+            );
+        }
         return issueTokens(user);
     }
 
@@ -85,6 +112,43 @@ public class AuthenticationService {
         revokeRefreshToken(refreshToken);
     }
 
+    @Transactional
+    public IssuedTokens confirmEmailVerification(ConfirmEmailVerificationRequest request) {
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository
+                .findByTokenHash(hashToken(request.getToken()))
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_EMAIL_VERIFICATION_INVALID));
+
+        User user = verificationToken.getUser();
+        if (user.isEmailVerified()) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_VERIFIED);
+        }
+        if (verificationToken.getUsedAt() != null) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_VERIFICATION_INVALID);
+        }
+        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_VERIFICATION_EXPIRED);
+        }
+
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        verificationToken.setUsedAt(LocalDateTime.now());
+        repository.save(user);
+
+        return issueTokens(user);
+    }
+
+    @Transactional
+    public EmailVerificationStatusResponse resendEmailVerification(ResendEmailVerificationRequest request) {
+        User user = repository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_USER_NOT_FOUND));
+
+        if (user.isEmailVerified()) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_VERIFIED);
+        }
+
+        return issueAndSendVerificationToken(user);
+    }
+
     private IssuedTokens issueTokens(User user) {
         String accessTokenId = UUID.randomUUID().toString();
         String refreshTokenId = UUID.randomUUID().toString();
@@ -102,6 +166,53 @@ public class AuthenticationService {
     }
 
     public record IssuedTokens(String accessToken, String refreshToken) {
+    }
+
+    private EmailVerificationStatusResponse issueAndSendVerificationToken(User user) {
+        emailVerificationTokenRepository.deleteByUserAndUsedAtIsNull(user);
+
+        String rawToken = generateVerificationToken();
+        EmailVerificationToken verificationToken = EmailVerificationToken.builder()
+                .user(user)
+                .tokenHash(hashToken(rawToken))
+                .expiresAt(LocalDateTime.now().plus(emailVerificationProperties.getTokenExpiration()))
+                .build();
+        emailVerificationTokenRepository.save(verificationToken);
+
+        try {
+            emailVerificationNotificationService.sendVerificationEmail(user, rawToken);
+        } catch (MailException ex) {
+            throw new ApiException(
+                    ErrorCode.SERVICE_UNAVAILABLE,
+                    "Unable to send verification email right now",
+                    ex
+            );
+        }
+
+        return EmailVerificationStatusResponse.builder()
+                .email(user.getEmail())
+                .expiresInMinutes(emailVerificationProperties.getTokenExpiration().toMinutes())
+                .build();
+    }
+
+    private String generateVerificationToken() {
+        byte[] buffer = new byte[32];
+        secureRandom.nextBytes(buffer);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(buffer);
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte item : hash) {
+                builder.append(String.format("%02x", item));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
+        }
     }
 
     private void revokeAccessToken(String accessToken) {

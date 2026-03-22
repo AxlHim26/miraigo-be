@@ -21,6 +21,10 @@ public enum ErrorCode {
     AUTH_EMAIL_EXISTS("1007", HttpStatus.CONFLICT, "Email already exists"),
     AUTH_ADMIN_REGISTRATION_DISABLED("1008", HttpStatus.FORBIDDEN, "Admin registration is disabled"),
     AUTH_ADMIN_REGISTRATION_INVALID_KEY("1009", HttpStatus.FORBIDDEN, "Invalid admin registration key"),
+    AUTH_EMAIL_NOT_VERIFIED("1010", HttpStatus.FORBIDDEN, "Please verify your email before signing in"),
+    AUTH_EMAIL_VERIFICATION_INVALID("1011", HttpStatus.BAD_REQUEST, "Invalid verification link"),
+    AUTH_EMAIL_VERIFICATION_EXPIRED("1012", HttpStatus.GONE, "Verification link has expired"),
+    AUTH_EMAIL_ALREADY_VERIFIED("1013", HttpStatus.CONFLICT, "Email is already verified"),
 
     // Validation Errors (2xxx)
     VALIDATION_FAILED("2001", HttpStatus.BAD_REQUEST, "Validation failed"),
