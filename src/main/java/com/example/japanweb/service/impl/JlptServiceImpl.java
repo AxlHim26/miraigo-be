@@ -459,6 +459,7 @@ public class JlptServiceImpl implements JlptService {
                     .questionId(question.getId())
                     .questionNumber(question.getQuestionNumber())
                     .prompt(question.getPrompt())
+                    .explanation(question.getExplanation())
                     .selectedOptionKey(selectedOption)
                     .correctOptionKey(correctOption)
                     .correct(correct)
@@ -540,6 +541,7 @@ public class JlptServiceImpl implements JlptService {
                             .partNumber(question.getPartNumber())
                             .questionNumber(question.getQuestionNumber())
                             .prompt(question.getPrompt())
+                            .explanation(question.getExplanation())
                             .options(optionsByQuestion.getOrDefault(question.getId(), List.of()).stream()
                                     .map(option -> JlptQuestionOptionDTO.builder()
                                             .key(option.getOptionKey())
@@ -566,5 +568,69 @@ public class JlptServiceImpl implements JlptService {
     }
 
     private record SectionScoring(JlptAttemptSectionResultDTO sectionResult, int scaledScore) {
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JlptQuestionDTO> getPracticeQuestions(String level, String sectionType, int limit) {
+        JlptSectionType typeEnum;
+        try {
+            typeEnum = JlptSectionType.valueOf(sectionType.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        List<JlptQuestion> questions = jlptQuestionRepository.findBySection_Exam_LevelAndSection_SectionType(level.toUpperCase(), typeEnum);
+        
+        // Shuffle to get random questions for practice
+        List<JlptQuestion> shuffled = new ArrayList<>(questions);
+        Collections.shuffle(shuffled);
+        if (shuffled.size() > limit) {
+            shuffled = shuffled.subList(0, limit);
+        }
+
+        List<Long> questionIds = shuffled.stream().map(JlptQuestion::getId).toList();
+        Map<Long, List<JlptQuestionOption>> optionsByQuestion = groupOptionsByQuestionId(questionIds);
+
+        return shuffled.stream().map(question -> JlptQuestionDTO.builder()
+                .id(question.getId())
+                .partNumber(question.getPartNumber())
+                .questionNumber(question.getQuestionNumber())
+                .prompt(question.getPrompt())
+                .explanation(question.getExplanation())
+                .options(optionsByQuestion.getOrDefault(question.getId(), List.of()).stream()
+                        .map(option -> JlptQuestionOptionDTO.builder()
+                                .key(option.getOptionKey())
+                                .text(option.getOptionText())
+                                .build())
+                        .toList())
+                .build()).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String evaluatePlacementTest(JlptSaveAnswersRequest request) {
+        if (request.getAnswers() == null || request.getAnswers().isEmpty()) {
+            return "N5";
+        }
+        
+        int correctCount = 0;
+        int totalQuestions = request.getAnswers().size();
+        
+        List<Long> questionIds = request.getAnswers().stream().map(JlptSaveAnswersRequest.AnswerItem::getQuestionId).toList();
+        Map<Long, JlptAnswerKey> answerKeys = mapAnswerKeys(questionIds);
+
+        for (JlptSaveAnswersRequest.AnswerItem item : request.getAnswers()) {
+            JlptAnswerKey key = answerKeys.get(item.getQuestionId());
+            if (key != null && key.getCorrectOptionKey().equalsIgnoreCase(item.getSelectedOptionKey())) {
+                correctCount++;
+            }
+        }
+        
+        double accuracy = (double) correctCount / totalQuestions;
+        if (accuracy > 0.8) return "N2";
+        if (accuracy > 0.6) return "N3";
+        if (accuracy > 0.4) return "N4";
+        return "N5";
     }
 }

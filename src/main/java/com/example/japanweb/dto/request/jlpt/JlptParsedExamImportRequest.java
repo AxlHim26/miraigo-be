@@ -51,6 +51,7 @@ public class JlptParsedExamImportRequest {
     public static class ParsedQuestion {
         private String number;
         private String prompt;
+        private String explanation;
         private List<ParsedOption> options;
         private String correctAnswer;
     }

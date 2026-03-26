@@ -34,6 +34,9 @@ public class JlptQuestion {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String prompt;
 
+    @Column(columnDefinition = "TEXT")
+    private String explanation;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

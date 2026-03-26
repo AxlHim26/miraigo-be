@@ -74,4 +74,18 @@ public class JlptController {
     public ApiResponse<List<JlptAttemptSummaryDTO>> getAttemptHistory(@AuthenticationPrincipal User user) {
         return ApiResponse.success(jlptService.getAttemptHistory(user.getId()));
     }
+
+    @GetMapping("/practice")
+    public ApiResponse<List<JlptQuestionDTO>> getPracticeQuestions(
+            @RequestParam String level,
+            @RequestParam String sectionType,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ApiResponse.success(jlptService.getPracticeQuestions(level, sectionType, limit));
+    }
+
+    @PostMapping("/placement")
+    public ApiResponse<String> evaluatePlacementTest(@Valid @RequestBody JlptSaveAnswersRequest request) {
+        return ApiResponse.success(jlptService.evaluatePlacementTest(request));
+    }
 }
