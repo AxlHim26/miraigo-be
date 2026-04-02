@@ -35,3 +35,4 @@ build/
 # Environment and secrets
 .env
 secrets/
+jlpt_roadmap.md

@@ -12,6 +12,8 @@ public class JlptQuestionDTO {
     private Integer partNumber;
     private Integer questionNumber;
     private String prompt;
+    private String passageText;
+    private String audioUrl;
     private String explanation;
     private List<JlptQuestionOptionDTO> options;
 }
