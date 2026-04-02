@@ -15,5 +15,6 @@ public class JlptQuestionDTO {
     private String passageText;
     private String audioUrl;
     private String explanation;
+    private String correctOptionKey;
     private List<JlptQuestionOptionDTO> options;
 }

@@ -596,7 +596,11 @@ public class JlptServiceImpl implements JlptService {
         List<Long> questionIds = shuffled.stream().map(JlptQuestion::getId).toList();
         Map<Long, List<JlptQuestionOption>> optionsByQuestion = groupOptionsByQuestionId(questionIds);
 
-        return shuffled.stream().map(question -> JlptQuestionDTO.builder()
+        Map<Long, JlptAnswerKey> answerKeys = mapAnswerKeys(questionIds);
+
+        return shuffled.stream().map(question -> {
+            JlptAnswerKey key = answerKeys.get(question.getId());
+            return JlptQuestionDTO.builder()
                 .id(question.getId())
                 .partNumber(question.getPartNumber())
                 .questionNumber(question.getQuestionNumber())
@@ -604,13 +608,15 @@ public class JlptServiceImpl implements JlptService {
                 .passageText(question.getPassageText())
                 .audioUrl(question.getAudioUrl())
                 .explanation(question.getExplanation())
+                .correctOptionKey(key != null ? key.getCorrectOptionKey() : null)
                 .options(optionsByQuestion.getOrDefault(question.getId(), List.of()).stream()
                         .map(option -> JlptQuestionOptionDTO.builder()
                                 .key(option.getOptionKey())
                                 .text(option.getOptionText())
                                 .build())
                         .toList())
-                .build()).toList();
+                .build();
+        }).toList();
     }
 
     @Override
