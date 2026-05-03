@@ -581,7 +581,7 @@ public class JlptServiceImpl implements JlptService {
         try {
             typeEnum = JlptSectionType.valueOf(sectionType.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+            throw new ApiException(ErrorCode.VALIDATION_FAILED);
         }
 
         List<JlptQuestion> questions = jlptQuestionRepository.findBySection_Exam_LevelAndSection_SectionType(level.toUpperCase(), typeEnum);
