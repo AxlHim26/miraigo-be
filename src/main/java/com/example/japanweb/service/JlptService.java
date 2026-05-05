@@ -22,4 +22,8 @@ public interface JlptService {
     JlptAttemptResultDTO getAttemptResult(Long attemptId, Long userId);
 
     List<JlptAttemptSummaryDTO> getAttemptHistory(Long userId);
+
+    List<JlptQuestionDTO> getPracticeQuestions(String level, String sectionType, int limit);
+
+    String evaluatePlacementTest(JlptSaveAnswersRequest request);
 }

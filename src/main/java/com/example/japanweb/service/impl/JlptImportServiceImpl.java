@@ -226,6 +226,7 @@ public class JlptImportServiceImpl implements JlptImportService {
                                 .section(section)
                                 .questionNumber(questionNumber)
                                 .prompt(pq.getPrompt().trim())
+                                .explanation(pq.getExplanation() != null ? pq.getExplanation().trim() : null)
                                 .build()
                 );
 

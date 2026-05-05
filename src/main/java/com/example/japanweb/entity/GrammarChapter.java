@@ -27,7 +27,7 @@ public class GrammarChapter {
     @Column(nullable = false)
     private String title;
 
-    @Column(name = "chapter_order", nullable = false)
+    @Column(name = "display_order", nullable = false)
     private Integer chapterOrder;
 
     @OneToMany(mappedBy = "chapter", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)

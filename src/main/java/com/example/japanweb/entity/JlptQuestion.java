@@ -34,6 +34,15 @@ public class JlptQuestion {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String prompt;
 
+    @Column(name = "passage_text", columnDefinition = "TEXT")
+    private String passageText;
+
+    @Column(name = "audio_url", length = 800)
+    private String audioUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String explanation;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

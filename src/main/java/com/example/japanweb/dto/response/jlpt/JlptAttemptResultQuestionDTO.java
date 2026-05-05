@@ -11,6 +11,9 @@ public class JlptAttemptResultQuestionDTO {
     private Long questionId;
     private Integer questionNumber;
     private String prompt;
+    private String passageText;
+    private String audioUrl;
+    private String explanation;
     private String selectedOptionKey;
     private String correctOptionKey;
     private boolean correct;

@@ -10,4 +10,8 @@ import java.util.List;
 public interface JlptQuestionRepository extends JpaRepository<JlptQuestion, Long> {
 
     List<JlptQuestion> findBySectionIdInOrderByQuestionNumberAsc(List<Long> sectionIds);
+
+    List<JlptQuestion> findBySection_Exam_LevelAndSection_SectionType(String level, com.example.japanweb.entity.JlptSectionType sectionType);
+
+    List<JlptQuestion> findBySection_Exam_Level(String level);
 }
