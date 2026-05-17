@@ -5,6 +5,8 @@ import com.example.japanweb.dto.request.jlpt.JlptSaveAnswersRequest;
 import com.example.japanweb.dto.response.jlpt.*;
 import com.example.japanweb.entity.User;
 import com.example.japanweb.service.JlptService;
+import com.example.japanweb.service.JlptImportService;
+import com.example.japanweb.dto.request.jlpt.JlptCommunityExamImportRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +20,7 @@ import java.util.List;
 public class JlptController {
 
     private final JlptService jlptService;
+    private final JlptImportService jlptImportService;
 
     @GetMapping("/exams")
     public ApiResponse<List<JlptExamListItemDTO>> getExams() {
@@ -35,6 +38,24 @@ public class JlptController {
             @AuthenticationPrincipal User user
     ) {
         return ApiResponse.success(jlptService.startAttempt(examId, user.getId()));
+    }
+
+    @PostMapping("/attempts/{attemptId}/sections/{sectionId}/start")
+    public ApiResponse<JlptSectionAttemptDTO> startSectionAttempt(
+            @PathVariable Long attemptId,
+            @PathVariable Long sectionId,
+            @AuthenticationPrincipal User user
+    ) {
+        return ApiResponse.success(jlptService.startSectionAttempt(attemptId, sectionId, user.getId()));
+    }
+
+    @PostMapping("/attempts/{attemptId}/sections/{sectionId}/submit")
+    public ApiResponse<JlptSectionAttemptDTO> submitSectionAttempt(
+            @PathVariable Long attemptId,
+            @PathVariable Long sectionId,
+            @AuthenticationPrincipal User user
+    ) {
+        return ApiResponse.success(jlptService.submitSectionAttempt(attemptId, sectionId, user.getId()));
     }
 
     @GetMapping("/attempts/{attemptId}")
@@ -87,5 +108,14 @@ public class JlptController {
     @PostMapping("/placement")
     public ApiResponse<String> evaluatePlacementTest(@Valid @RequestBody JlptSaveAnswersRequest request) {
         return ApiResponse.success(jlptService.evaluatePlacementTest(request));
+    }
+
+    @PostMapping("/community-exams/import")
+    public ApiResponse<JlptParsedExamImportResultDTO> importCommunityExam(
+            @Valid @RequestBody JlptCommunityExamImportRequest request) {
+        JlptParsedExamImportResultDTO result = jlptImportService.importCommunityExam(request);
+        String message = String.format("Community exam imported: %d sections, %d questions",
+                result.getImportedSections(), result.getImportedQuestions());
+        return ApiResponse.success(result, message);
     }
 }

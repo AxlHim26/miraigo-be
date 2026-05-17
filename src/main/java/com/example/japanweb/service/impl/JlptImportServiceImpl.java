@@ -121,6 +121,31 @@ public class JlptImportServiceImpl implements JlptImportService {
 
     @Override
     @Transactional
+    public JlptParsedExamImportResultDTO importCommunityExam(com.example.japanweb.dto.request.jlpt.JlptCommunityExamImportRequest request) {
+        String examCode = request.getLevel().toUpperCase() + "-COMM-" + System.currentTimeMillis();
+        
+        JlptExam exam = JlptExam.builder()
+                .code(examCode)
+                .title(request.getTitle())
+                .level(request.getLevel().toUpperCase())
+                .examYear(java.time.LocalDate.now().getYear())
+                .examMonth(java.time.LocalDate.now().getMonthValue())
+                .totalDurationMinutes(defaultDurationByLevel(request.getLevel().toUpperCase()))
+                .contentStatus(JlptContentStatus.DRAFT)
+                .published(true)
+                .build();
+        jlptExamRepository.save(exam);
+
+        JlptParsedExamImportRequest parsedRequest = new JlptParsedExamImportRequest();
+        parsedRequest.setExamCode(examCode);
+        parsedRequest.setReplaceExisting(false);
+        parsedRequest.setSections(request.getSections());
+
+        return importParsedExam(parsedRequest);
+    }
+
+    @Override
+    @Transactional
     public JlptParsedExamImportResultDTO importParsedExam(JlptParsedExamImportRequest request) {
         String examCode = request.getExamCode();
         if (examCode == null || examCode.isBlank()) {
@@ -259,6 +284,7 @@ public class JlptImportServiceImpl implements JlptImportService {
         jlptExamRepository.save(exam);
 
         return JlptParsedExamImportResultDTO.builder()
+                .examId(exam.getId())
                 .examCode(examCode)
                 .importedSections(importedSections)
                 .importedQuestions(importedQuestions)

@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 @Builder
 public class JlptParsedExamImportResultDTO {
+    private Long examId;
     private String examCode;
     private int importedSections;
     private int importedQuestions;

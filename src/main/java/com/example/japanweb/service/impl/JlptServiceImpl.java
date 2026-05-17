@@ -49,6 +49,7 @@ public class JlptServiceImpl implements JlptService {
     private final JlptAnswerKeyRepository jlptAnswerKeyRepository;
     private final JlptAttemptRepository jlptAttemptRepository;
     private final JlptAttemptAnswerRepository jlptAttemptAnswerRepository;
+    private final JlptSectionAttemptRepository jlptSectionAttemptRepository;
     private final JlptExamAssetRepository jlptExamAssetRepository;
     private final UserRepository userRepository;
 
@@ -152,6 +153,17 @@ public class JlptServiceImpl implements JlptService {
                         .build())
                 .toList();
 
+        List<JlptSectionAttemptDTO> sectionAttempts = jlptSectionAttemptRepository.findByAttemptId(attempt.getId()).stream()
+                .map(sa -> JlptSectionAttemptDTO.builder()
+                        .sectionId(sa.getSection().getId())
+                        .sectionStatus(sa.getStatus().name())
+                        .startedAt(sa.getStartedAt())
+                        .submittedAt(sa.getSubmittedAt())
+                        .expiresAt(sa.getExpiresAt())
+                        .remainingSeconds(getSectionRemainingSeconds(sa))
+                        .build())
+                .toList();
+
         return JlptStartAttemptResponseDTO.builder()
                 .attemptId(attempt.getId())
                 .examId(attempt.getExam().getId())
@@ -159,8 +171,55 @@ public class JlptServiceImpl implements JlptService {
                 .startedAt(attempt.getStartedAt())
                 .totalDurationMinutes(attempt.getExam().getTotalDurationMinutes())
                 .remainingSeconds(remainingSeconds)
+                .sectionAttempts(sectionAttempts)
                 .answers(answers)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public JlptSectionAttemptDTO startSectionAttempt(Long attemptId, Long sectionId, Long userId) {
+        JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
+        ensureAttemptInProgress(attempt);
+        
+        JlptSection section = jlptSectionRepository.findById(sectionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.JLPT_SECTION_NOT_FOUND));
+                
+        if (!section.getExam().getId().equals(attempt.getExam().getId())) {
+            throw new ApiException(ErrorCode.JLPT_SECTION_NOT_FOUND);
+        }
+
+        Optional<JlptSectionAttempt> existing = jlptSectionAttemptRepository.findByAttemptIdAndSectionId(attemptId, sectionId);
+        if (existing.isPresent()) {
+            return mapToSectionAttemptDTO(existing.get());
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plusMinutes(section.getDurationMinutes()).plusMinutes(2);
+
+        JlptSectionAttempt sa = jlptSectionAttemptRepository.save(
+                JlptSectionAttempt.builder()
+                        .attempt(attempt)
+                        .section(section)
+                        .status(JlptAttemptStatus.IN_PROGRESS)
+                        .startedAt(now)
+                        .expiresAt(expiresAt)
+                        .build()
+        );
+
+        return mapToSectionAttemptDTO(sa);
+    }
+
+    @Override
+    @Transactional
+    public JlptSectionAttemptDTO submitSectionAttempt(Long attemptId, Long sectionId, Long userId) {
+        JlptAttempt attempt = getAttemptOrThrow(attemptId, userId);
+        JlptSectionAttempt sa = jlptSectionAttemptRepository.findByAttemptIdAndSectionId(attemptId, sectionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.JLPT_SECTION_NOT_FOUND));
+                
+        sa.setStatus(JlptAttemptStatus.SUBMITTED);
+        sa.setSubmittedAt(LocalDateTime.now());
+        return mapToSectionAttemptDTO(jlptSectionAttemptRepository.save(sa));
     }
 
     @Override
@@ -294,6 +353,17 @@ public class JlptServiceImpl implements JlptService {
         return exam;
     }
 
+    private JlptSectionAttemptDTO mapToSectionAttemptDTO(JlptSectionAttempt sa) {
+        return JlptSectionAttemptDTO.builder()
+                .sectionId(sa.getSection().getId())
+                .sectionStatus(sa.getStatus().name())
+                .startedAt(sa.getStartedAt())
+                .submittedAt(sa.getSubmittedAt())
+                .expiresAt(sa.getExpiresAt())
+                .remainingSeconds(getSectionRemainingSeconds(sa))
+                .build();
+    }
+
     private JlptAttempt getAttemptOrThrow(Long attemptId, Long userId) {
         return jlptAttemptRepository.findByIdAndUserId(attemptId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.JLPT_ATTEMPT_NOT_FOUND));
@@ -321,6 +391,20 @@ public class JlptServiceImpl implements JlptService {
         long elapsedSeconds = Duration.between(attempt.getStartedAt(), now).getSeconds();
         // Give 5 minutes grace period for legacy attempts without expiresAt
         int totalSeconds = (attempt.getExam().getTotalDurationMinutes() + 5) * 60;
+        return Math.max(0, (int) (totalSeconds - elapsedSeconds));
+    }
+
+    private int getSectionRemainingSeconds(JlptSectionAttempt sa) {
+        if (sa.getStatus() == JlptAttemptStatus.SUBMITTED) {
+            return 0;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (sa.getExpiresAt() != null) {
+            long remaining = Duration.between(now, sa.getExpiresAt()).getSeconds();
+            return Math.max(0, (int) remaining);
+        }
+        long elapsedSeconds = Duration.between(sa.getStartedAt(), now).getSeconds();
+        int totalSeconds = (sa.getSection().getDurationMinutes() + 2) * 60; // 2 min grace
         return Math.max(0, (int) (totalSeconds - elapsedSeconds));
     }
 
@@ -577,14 +661,18 @@ public class JlptServiceImpl implements JlptService {
     @Override
     @Transactional(readOnly = true)
     public List<JlptQuestionDTO> getPracticeQuestions(String level, String sectionType, int limit) {
-        JlptSectionType typeEnum;
-        try {
-            typeEnum = JlptSectionType.valueOf(sectionType.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED);
+        List<JlptQuestion> questions;
+        if ("PLACEMENT".equalsIgnoreCase(level) && "ASSESSMENT".equalsIgnoreCase(sectionType)) {
+            questions = jlptQuestionRepository.findAll();
+        } else {
+            JlptSectionType typeEnum;
+            try {
+                typeEnum = JlptSectionType.valueOf(sectionType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED);
+            }
+            questions = jlptQuestionRepository.findBySection_Exam_LevelAndSection_SectionType(level.toUpperCase(), typeEnum);
         }
-
-        List<JlptQuestion> questions = jlptQuestionRepository.findBySection_Exam_LevelAndSection_SectionType(level.toUpperCase(), typeEnum);
         
         // Shuffle to get random questions for practice
         List<JlptQuestion> shuffled = new ArrayList<>(questions);
