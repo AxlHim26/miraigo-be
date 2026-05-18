@@ -50,7 +50,6 @@ public class JlptServiceImpl implements JlptService {
     private final JlptAttemptRepository jlptAttemptRepository;
     private final JlptAttemptAnswerRepository jlptAttemptAnswerRepository;
     private final JlptSectionAttemptRepository jlptSectionAttemptRepository;
-    private final JlptExamAssetRepository jlptExamAssetRepository;
     private final UserRepository userRepository;
 
     @Override
@@ -351,17 +350,6 @@ public class JlptServiceImpl implements JlptService {
         }
 
         return exam;
-    }
-
-    private JlptSectionAttemptDTO mapToSectionAttemptDTO(JlptSectionAttempt sa) {
-        return JlptSectionAttemptDTO.builder()
-                .sectionId(sa.getSection().getId())
-                .sectionStatus(sa.getStatus().name())
-                .startedAt(sa.getStartedAt())
-                .submittedAt(sa.getSubmittedAt())
-                .expiresAt(sa.getExpiresAt())
-                .remainingSeconds(getSectionRemainingSeconds(sa))
-                .build();
     }
 
     private JlptAttempt getAttemptOrThrow(Long attemptId, Long userId) {

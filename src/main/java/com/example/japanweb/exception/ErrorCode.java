@@ -62,6 +62,7 @@ public enum ErrorCode {
 
     // JLPT Errors (8xxx)
     JLPT_EXAM_NOT_FOUND("8001", HttpStatus.NOT_FOUND, "JLPT exam not found"),
+    JLPT_SECTION_NOT_FOUND("8011", HttpStatus.NOT_FOUND, "JLPT section not found"),
     JLPT_ATTEMPT_NOT_FOUND("8002", HttpStatus.NOT_FOUND, "JLPT attempt not found"),
     JLPT_ATTEMPT_ALREADY_SUBMITTED("8003", HttpStatus.CONFLICT, "JLPT attempt already submitted"),
     JLPT_QUESTION_NOT_FOUND("8004", HttpStatus.NOT_FOUND, "JLPT question not found"),

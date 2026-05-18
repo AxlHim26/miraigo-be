@@ -10,4 +10,6 @@ public interface JlptImportService {
     JlptImportResultDTO importFromManifest(JlptImportRequest request);
 
     JlptParsedExamImportResultDTO importParsedExam(JlptParsedExamImportRequest request);
+
+    JlptParsedExamImportResultDTO importCommunityExam(com.example.japanweb.dto.request.jlpt.JlptCommunityExamImportRequest request);
 }

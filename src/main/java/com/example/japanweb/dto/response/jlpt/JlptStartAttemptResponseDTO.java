@@ -16,5 +16,6 @@ public class JlptStartAttemptResponseDTO {
     private LocalDateTime startedAt;
     private Integer totalDurationMinutes;
     private Integer remainingSeconds;
+    private List<JlptSectionAttemptDTO> sectionAttempts;
     private List<JlptAttemptAnswerDTO> answers;
 }
