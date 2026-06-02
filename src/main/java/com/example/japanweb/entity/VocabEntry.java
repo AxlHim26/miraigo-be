@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Data
 @Entity
@@ -13,7 +14,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table(name = "vocab_entries", indexes = {
         @Index(name = "idx_vocab_entries_course_term", columnList = "course_id, term"),
-        @Index(name = "idx_vocab_entries_level", columnList = "level")
+        @Index(name = "idx_vocab_entries_level", columnList = "level"),
+        @Index(name = "idx_vocab_entries_course_random_key", columnList = "course_id, random_key")
 })
 public class VocabEntry {
 
@@ -42,8 +44,15 @@ public class VocabEntry {
     @Column(length = 10)
     private String level;
 
-    @Column(name = "random_key", nullable = false, insertable = false, updatable = false)
+    @Column(name = "random_key", nullable = false)
     private Double randomKey;
+
+    @PrePersist
+    void assignRandomKey() {
+        if (randomKey == null) {
+            randomKey = ThreadLocalRandom.current().nextDouble();
+        }
+    }
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

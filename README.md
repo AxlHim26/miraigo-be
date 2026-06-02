@@ -20,7 +20,8 @@ MiraiGo Backend is the core API platform for MiraiGo, a Japanese learning system
 - **Spring Security**
 - **Spring Data JPA (PostgreSQL)**
 - **Spring Data Redis**
-- **Flyway** migrations
+- **Hibernate** schema management (`ddl-auto`)
+- **JLPT mock exams** auto-seeded from `mock_tests/*.json` on startup
 - **Micrometer + Prometheus** metrics
 - **Maven**
 - **Docker Compose** deployment
