@@ -8,6 +8,7 @@ COPY mvnw pom.xml ./
 RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
 
 COPY src ./src
+COPY mock_tests ./mock_tests
 RUN ./mvnw -q -DskipTests package
 
 FROM eclipse-temurin:21-jre-jammy AS runtime
