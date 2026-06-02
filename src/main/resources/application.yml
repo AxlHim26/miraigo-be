@@ -69,7 +69,7 @@ app:
       refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:7d}
     email-verification:
       token-expiration: ${EMAIL_VERIFICATION_TOKEN_EXPIRATION:30m}
-      web-base-url: ${EMAIL_VERIFICATION_WEB_BASE_URL:http://localhost:3000}
+      web-base-url: ${NEXT_PUBLIC_APP_URL:${EMAIL_VERIFICATION_WEB_BASE_URL:http://localhost:3000}}
       verification-path: ${EMAIL_VERIFICATION_PATH:/verify-email}
       from-address: ${EMAIL_VERIFICATION_FROM_ADDRESS:no-reply@miraigo.local}
     auth-cookie:
