@@ -5,15 +5,15 @@ import com.example.japanweb.dto.request.auth.ConfirmEmailVerificationRequest;
 import com.example.japanweb.dto.request.auth.RegisterRequest;
 import com.example.japanweb.dto.request.auth.ResendEmailVerificationRequest;
 import com.example.japanweb.dto.response.auth.EmailVerificationStatusResponse;
-import com.example.japanweb.entity.User;
 import com.example.japanweb.entity.EmailVerificationToken;
+import com.example.japanweb.entity.User;
 import com.example.japanweb.exception.ApiException;
 import com.example.japanweb.exception.ErrorCode;
+import com.example.japanweb.config.properties.EmailVerificationProperties;
 import com.example.japanweb.repository.EmailVerificationTokenRepository;
 import com.example.japanweb.repository.UserRepository;
 import com.example.japanweb.security.AuthTokenStore;
 import com.example.japanweb.security.JwtService;
-import com.example.japanweb.config.properties.EmailVerificationProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.MailException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,14 +23,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.security.SecureRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -47,16 +48,18 @@ public class AuthenticationService {
 
     @Transactional
     public EmailVerificationStatusResponse register(RegisterRequest request) {
+        String normalizedEmail = normalizeEmail(request.getEmail());
+
         if (repository.existsByUsername(request.getUsername())) {
             throw new ApiException(ErrorCode.AUTH_USERNAME_EXISTS);
         }
-        if (repository.existsByEmail(request.getEmail())) {
+        if (repository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new ApiException(ErrorCode.AUTH_EMAIL_EXISTS);
         }
 
         var user = User.builder()
                 .username(request.getUsername())
-                .email(request.getEmail())
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.USER)
                 .emailVerified(false)
@@ -139,7 +142,7 @@ public class AuthenticationService {
 
     @Transactional
     public EmailVerificationStatusResponse resendEmailVerification(ResendEmailVerificationRequest request) {
-        User user = repository.findByEmail(request.getEmail())
+        User user = repository.findByEmailIgnoreCase(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new ApiException(ErrorCode.AUTH_USER_NOT_FOUND));
 
         if (user.isEmailVerified()) {
@@ -213,6 +216,10 @@ public class AuthenticationService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available", ex);
         }
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private void revokeAccessToken(String accessToken) {
