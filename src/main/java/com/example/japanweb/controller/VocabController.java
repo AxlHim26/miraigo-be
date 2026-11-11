@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -63,6 +64,8 @@ public class VocabController {
     /**
      * Get vocabulary entries due for review (SRS).
      */
+    // Read-only transaction: entries are mapped from lazy `vocab` proxies of the progress rows.
+    @Transactional(readOnly = true)
     @GetMapping("/review")
     public ApiResponse<List<VocabEntryDTO>> getDueForReview(
             @AuthenticationPrincipal User user,
