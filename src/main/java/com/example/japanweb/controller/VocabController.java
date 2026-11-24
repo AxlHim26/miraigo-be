@@ -7,6 +7,7 @@ import com.example.japanweb.dto.response.vocab.ReviewStatsDTO;
 import com.example.japanweb.dto.response.vocab.VocabCourseDTO;
 import com.example.japanweb.dto.response.vocab.VocabCourseDetailDTO;
 import com.example.japanweb.dto.response.vocab.VocabEntryDTO;
+import com.example.japanweb.dto.response.vocab.VocabProgressDTO;
 import com.example.japanweb.entity.User;
 import com.example.japanweb.entity.UserLearningProgress;
 import com.example.japanweb.repository.UserLearningProgressRepository;
@@ -124,6 +125,11 @@ public class VocabController {
                 .build();
 
         return ApiResponse.success(stats);
+    }
+
+    @GetMapping("/progress")
+    public ApiResponse<List<VocabProgressDTO>> getProgress(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(progressRepository.findProgressByUserId(user.getId()));
     }
 
     private String getReviewMessage(SrsService.Rating rating) {
