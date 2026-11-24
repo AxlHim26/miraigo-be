@@ -1,5 +1,6 @@
 package com.example.japanweb.repository;
 
+import com.example.japanweb.dto.response.vocab.VocabProgressDTO;
 import com.example.japanweb.entity.UserLearningProgress;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,6 +42,15 @@ public interface UserLearningProgressRepository extends JpaRepository<UserLearni
      * Count total vocabulary entries a user has started learning
      */
     long countByUserId(Long userId);
+
+    @Query("""
+            SELECT new com.example.japanweb.dto.response.vocab.VocabProgressDTO(
+                progress.vocab.id, progress.vocab.course.id, progress.createdAt, progress.lastReviewedAt,
+                progress.nextReviewAt, progress.repetitions)
+            FROM UserLearningProgress progress
+            WHERE progress.user.id = :userId
+            """)
+    List<VocabProgressDTO> findProgressByUserId(@Param("userId") Long userId);
 
     /**
      * Count vocabulary entries due for review
