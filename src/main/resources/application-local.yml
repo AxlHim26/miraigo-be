@@ -1,0 +1,4 @@
+app:
+  security:
+    local-session:
+      enabled: ${DEV_AUTO_LOGIN_ENABLED:false}
