@@ -13,7 +13,11 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "jlpt_attempt_answers")
+// The answer upsert relies on this constraint (ON CONFLICT). The tables are created by Hibernate, so it has to be
+// declared here; the name matches the one PostgreSQL gives the constraint in migration V22.
+@Table(name = "jlpt_attempt_answers", uniqueConstraints = @UniqueConstraint(
+        name = "jlpt_attempt_answers_attempt_id_question_id_key",
+        columnNames = {"attempt_id", "question_id"}))
 public class JlptAttemptAnswer {
 
     @Id
